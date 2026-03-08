@@ -2,7 +2,7 @@ import ReactDOM from 'react-dom';
 import React from 'react';
 import { Provider } from 'react-redux';
 import { Router, Route, hashHistory, IndexRoute } from 'react-router';
-
+import meetings from './meetings';
 import { api } from './apiClient';
 import store from './store/index';
 

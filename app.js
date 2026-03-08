@@ -15,6 +15,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 // Mount routers على /api
 app.use('/api', minionsRouter);
 app.use('/api', ideasRouter);

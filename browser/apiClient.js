@@ -14,5 +14,5 @@ const origin =
 
 export const api = axios.create({
   baseURL: `${origin}/api`,
-  timeout: 15000,
+
 });

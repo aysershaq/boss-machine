@@ -11,45 +11,50 @@ export const cancelMeetings = () => ({ type: CANCEL_MEETINGS });
 
 // Thunks
 export const createMeetingThunk = (meetingData) => {
-  return (dispatch) => {
-     console.log("Sending meeting data:", meetingData); // <-- 
-   return api.post('/meetings', meetingData, {
-      headers: { 'Content-Type': 'application/json' }
-    })
-    .then((res) => {
-      dispatch({ type: 'CREATE_MEETING', meeting: res.data });
-    })
-    .catch(err => {
-      console.error("Error creating meeting:", err);
-    });
+  return async (dispatch) => {
+    try {
+      console.log("Sending meeting data:", meetingData);
+      const res = await api.post('/meetings', meetingData, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      console.log("Created meeting:", res.data);
+      dispatch(createMeeting(res.data));
+    } catch (err) {
+      console.error("Error creating meeting:", err.response?.data || err.message);
+    }
   };
 };
 
-export const cancelMeetingsThunk = () => (dispatch) => {
-  return api
-    .delete('/meetings')
-    .then(() => {
+export const cancelMeetingsThunk = () => {
+  return async (dispatch) => {
+    try {
+      await api.delete('/meetings');
       dispatch(cancelMeetings());
-    })
-    .catch((err) => console.error('Error cancelling meetings:', err.response?.data || err.message));
+    } catch (err) {
+      console.error('Error cancelling meetings:', err.response?.data || err.message);
+    }
+  };
 };
 
 // Initial state
 const initial = [];
 
 // Reducer
-export default function meetingReducer(state = initial, action) {
+const meetingsReducer = (state = initial, action) => {
   switch (action.type) {
-    case CREATE_MEETING: {
-      const newMeetings = [action.meeting, ...state];
-      newMeetings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      return newMeetings;
-    }
-    case CANCEL_MEETINGS:
-      return [];
+
     case SET_MEETINGS:
       return action.meetings;
+
+    case CREATE_MEETING:
+      return [...state, action.meeting]; // <-- add new meeting to state
+
+    case CANCEL_MEETINGS:
+      return []; // <-- clear all meetings
+
     default:
       return state;
   }
-}
+};
+
+export default meetingsReducer;

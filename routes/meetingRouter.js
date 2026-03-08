@@ -42,8 +42,8 @@ console.error('Meeting creation error:', err);
 meetingRouter.delete(
   '/meetings',
   asyncHandler(async (req, res) => {
-    await Meeting.destroy({ where: {} });
-    res.sendStatus(204);
+   const deleted =  await Meeting.destroy({ where: {} });
+    res.sendStatus(204).json({msg:"deleted sucessfully ",deleted});
   })
 );
 
