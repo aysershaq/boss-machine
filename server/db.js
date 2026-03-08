@@ -98,7 +98,7 @@ const createMeeting = () => {
 const allMinions = new Array(10).fill(0).map(createMinion);
 const allIdeas = new Array(10).fill(0).map(createIdea);
 const allWork = allMinions.map(minion => createWork(minion.id));
-const allMeetings = new Array(3).fill(0).map(createMeeting);
+const allMeetings = [];
 
 const isValidMinion = (instance) => {
   instance.name = instance.name || '';

@@ -1,93 +1,105 @@
+'use strict';
 
+const express = require('express');
+const { sequelize, Minion, Work } = require('../models');
 
-const express = require('express')
+const workRouter = express.Router();
 
-const {deleteFromDatabasebyId,getAllFromDatabase ,getFromDatabaseById,findDataArrayByName,addToDatabase,addWorkToDatabase,updateInstanceInDatabase,}= require('../server/db.js')
-const workRouter = express.Router()
-const bodyParser = require('body-parser')
-const {db} =require('../server/db.js')
-const cors = require('cors');
-const path = require('path');
-const { Network } = require('inspector/promises')
-
-
-workRouter.use(cors()); 
-
-
-
-
-workRouter.use(bodyParser.json())
-
-
-// get all work of selected minion  from db
-workRouter.get('/minions/:minionId/work', (req, res, next) => {
-  const minionId = req.params.minionId;
-
-  // Get all work from the global work table
-  const allWork = getAllFromDatabase('work');
-
-  // Filter only work that belongs to this minion
-  const minionWork = allWork.filter(work => work.minionId === minionId);
-
-  res.send(minionWork);
-});
-
-workRouter.param('minionId',(req,res,next,id)=>{
-
-  try{
-    const foundMinion = getFromDatabaseById("minions",id)
-    if(foundMinion){
-      req.foundMinion = foundMinion
-      next()
-    }else{
-      next(new Error("no minion with this id found"))
-    }
-  }catch(err){
-    next(err)
-  }
+function isNumericId(value) {
+  return typeof value === 'string' && /^[0-9]+$/.test(value);
 }
-)
 
-// CREATE new work for specific minion
-workRouter.post('/minions/:minionId/work', (req, res, next) => {
-  const minionId = req.params.minionId;
-  const minion = getFromDatabaseById('minions', minionId);
-  if (!minion) return res.status(400).send('Invalid minionId');
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
 
-  const newWork = { ...req.body, minionId};
-  const createdWork = addToDatabase('work', newWork);
+function pickWorkPayload(body, forcedMinionId) {
+  return {
+    title: typeof body.title === 'string' ? body.title : '',
+    description: typeof body.description === 'string' ? body.description : '',
+    hours: Number.isFinite(Number(body.hours)) ? Number(body.hours) : 0,
+    // (افتراض) minionId يُفرض من الـ URL لضمان السلامة
+    minionId: Number(forcedMinionId),
+  };
+}
 
-  res.status(201).send(createdWork);
-});
+workRouter.param(
+  'minionId',
+  asyncHandler(async (req, res, next, minionId) => {
+    if (!isNumericId(minionId)) return res.sendStatus(404);
 
-// edit existing work with specified id 
-workRouter.put('/minions/:minionId/work/:workId', (req, res, next) => {
-  const newWork = req.body;
+    const minion = await Minion.findByPk(Number(minionId));
+    if (!minion) return res.sendStatus(404);
 
-  
-  newWork.minionId = req.params.minionId;
-  newWork.id = req.params.workId
+    req.minion = minion;
+    next();
+  })
+);
 
-  const updatedWork = updateInstanceInDatabase('work', newWork);
-  if (updatedWork) {
-    res.status(201).send(updatedWork);
-  } else {
-    res.status(400).send('Work must have a valid minionId that exists in the database');
-  }
-});
+workRouter.param(
+  'workId',
+  asyncHandler(async (req, res, next, workId) => {
+    if (!isNumericId(workId)) return res.sendStatus(404);
 
-// delete specified work associated with id 
-workRouter.delete('/minions/:minionId/work/:workId', (req, res, next) => {
- 
+    const work = await Work.findByPk(Number(workId));
+    if (!work) return res.sendStatus(404);
 
-  
-   id = req.params.workId
+    req.work = work;
+    next();
+  })
+);
 
-  const deletedWork = deleteFromDatabasebyId('work',id );
-  if (deletedWork) { 
-    res.status(201).json({status:"deleted successfuly"  , data:deletedWork});
-  } else {
-    res.status(400).send('Work must have a valid id  that exists in the database');
-  }
-});
-module.exports = workRouter
+workRouter.get(
+  '/minions/:minionId/work',
+  asyncHandler(async (req, res) => {
+    const work = await Work.findAll({
+      where: { minionId: Number(req.params.minionId) },
+      order: [['id', 'ASC']],
+    });
+    res.status(200).json(work);
+  })
+);
+
+workRouter.post(
+  '/minions/:minionId/work',
+  asyncHandler(async (req, res) => {
+    // (افتراض) إذا أرسل العميل minionId مختلف في body نرفض
+    if (req.body.minionId && String(req.body.minionId) !== String(req.params.minionId)) {
+      return res.status(400).send('minionId لا يطابق المسار');
+    }
+
+    const created = await sequelize.transaction(async (t) => {
+      return Work.create(pickWorkPayload(req.body, req.params.minionId), { transaction: t });
+    });
+
+    res.status(201).json(created);
+  })
+);
+
+workRouter.put(
+  '/minions/:minionId/work/:workId',
+  asyncHandler(async (req, res) => {
+    // إذا workId لا يتبع minionId في المسار نخالف اختبار المشروع الأصلي (400)
+    if (String(req.work.minionId) !== String(req.params.minionId)) {
+      return res.status(400).send('Work لا يتبع minionId المطلوب');
+    }
+
+    const payload = pickWorkPayload(req.body, req.params.minionId);
+    await req.work.update(payload);
+    res.status(200).json(req.work);
+  })
+);
+
+workRouter.delete(
+  '/minions/:minionId/work/:workId',
+  asyncHandler(async (req, res) => {
+    if (String(req.work.minionId) !== String(req.params.minionId)) {
+      return res.status(400).send('Work لا يتبع minionId المطلوب');
+    }
+
+    await req.work.destroy();
+    res.sendStatus(204);
+  })
+);
+
+module.exports = workRouter;

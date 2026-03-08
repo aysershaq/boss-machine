@@ -11,7 +11,7 @@ import { setSelectedMinion } from './store/selectedMinion';
 import { setIdeas } from './store/ideas';
 import { setSelectedIdea } from './store/selectedIdea';
 import { setWork } from './store/work';
-import { setMeetings } from './store/meetings'; 
+import { setMeetings } from './store/meetings';
 import { setIdeaEditing, setMinionEditing, resetEditingState } from './store/appState';
 
 import App from './components/App';
@@ -25,7 +25,7 @@ const appEnter = nextRouterState => {
   Promise.all([
     axios.get('http://localhost:4001/api/minions'),
     axios.get('http://localhost:4001/api/ideas'),
-    axios.get('http://localhost:4001/api/meetings'),
+    axios.get('http://localhost:4001/api/meetings')
   ])
   .then(([minionsResponse,ideasResponse, meetingsResponse]) => {
     return [minionsResponse.data, ideasResponse.data, meetingsResponse.data];
@@ -33,7 +33,7 @@ const appEnter = nextRouterState => {
   .then(([minions, ideas, meetings]) => {
     store.dispatch(setMinions(minions));
     store.dispatch(setIdeas(ideas));
-    store.dispatch(setMeetings(meetings));
+      store.dispatch(setMeetings(meetings));
   })
   .catch(console.error.bind(console));
 }

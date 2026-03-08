@@ -1,61 +1,55 @@
-import axios from 'axios';
+import { api } from '../apiClient';
 
 const CREATE_MEETING = 'CREATE_MEETING';
 const CANCEL_MEETINGS = 'CANCEL_MEETINGS';
 const SET_MEETINGS = 'SET_MEETINGS';
 
-export const setMeetings = meetings => {
-  return {
-    type: SET_MEETINGS,
-    meetings,
-  }
-}
+// Action creators
+export const setMeetings = (meetings) => ({ type: SET_MEETINGS, meetings });
+export const createMeeting = (meeting) => ({ type: CREATE_MEETING, meeting });
+export const cancelMeetings = () => ({ type: CANCEL_MEETINGS });
 
-export const createMeeting = meeting => {
-  return {
-    type: CREATE_MEETING,
-    meeting,
-  }
-}
+// Thunks
+export const createMeetingThunk = (meetingData) => {
+  return (dispatch) => {
+     console.log("Sending meeting data:", meetingData); // <-- 
+   return api.post('/meetings', meetingData, {
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then((res) => {
+      dispatch({ type: 'CREATE_MEETING', meeting: res.data });
+    })
+    .catch(err => {
+      console.error("Error creating meeting:", err);
+    });
+  };
+};
 
-export const cancelMeetings = () => {
-  return {
-    type: CANCEL_MEETINGS
-  }
-}
+export const cancelMeetingsThunk = () => (dispatch) => {
+  return api
+    .delete('/meetings')
+    .then(() => {
+      dispatch(cancelMeetings());
+    })
+    .catch((err) => console.error('Error cancelling meetings:', err.response?.data || err.message));
+};
 
-export const createMeetingThunk = () => dispatch => {
-  axios.post('http://localhost:4001/api/meetings')
-  .then(res => res.data)
-  .then(createdMeeting => {
-    dispatch(createMeeting(createdMeeting));
-  })
-  .catch(console.error.bind(console));
-}
-
-export const cancelMeetingsThunk = () => dispatch => {
-  axios.delete('http://localhost:4001/api/meetings')
-  .then(() => {
-    dispatch(cancelMeetings());
-  })
-  .catch(console.error.bind(console));
-}
-
+// Initial state
 const initial = [];
 
-export default (initialState = initial, action) => {
-  switch(action.type) {
-    case CREATE_MEETING:
-      const newMeetings = [action.meeting, ...initialState];
-      newMeetings.sort((a, b) => { 
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
-      });
+// Reducer
+export default function meetingReducer(state = initial, action) {
+  switch (action.type) {
+    case CREATE_MEETING: {
+      const newMeetings = [action.meeting, ...state];
+      newMeetings.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       return newMeetings;
+    }
     case CANCEL_MEETINGS:
       return [];
     case SET_MEETINGS:
       return action.meetings;
     default:
-      return initialState;
+      return state;
   }
 }

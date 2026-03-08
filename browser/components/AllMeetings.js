@@ -2,71 +2,43 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import Meeting from './Meeting';
 
-import { createMeetingThunk } from '../store/meetings';
-
 class AllMeetings extends Component {
-
-  constructor(props) {
-    super(props);
-    this.state = {
-      timeoutId: null,
-      timeoutTime: 5000,
-    }
-  }
-
-  componentDidMount() {
-    let timeoutId = null;
-    const addMeeting = () => {
-      this.props.createMeeting();
-      timeoutId = window.setTimeout(addMeeting, this.state.timeoutTime);
-      this.setState({
-        timeoutId,
-        timeoutTime: Math.random() * 10000 + 3000,
-      });
-    }
-    addMeeting();
-  }
-
-  componentWillUnmount() {
-    window.clearTimeout(this.state.timeoutId);
-  }
-
   render() {
-    const allMeetings = this.props.meetings.map(meeting => {
-      return <Meeting key={meeting.date} day={meeting.day} time={meeting.time} note={meeting.note} />
-    });
-  
+
+    console.log(this.props.meetings)
+    const allMeetings = this.props.meetings.map(meeting => (
+      <Meeting
+        key={meeting.id}
+        day={meeting.day}
+        time={meeting.time}
+        note={meeting.note}
+        meetingDate={meeting.date} // pass as meetingDate
+      />
+    ));
+
     return (
       <div id="meetings-landing">
-        <div className="label meetings-label">
-          Meetings
-        </div>
+        <div className="label meetings-label">Meetings</div>
         <div id="meetings-table">
           <table>
             <thead>
               <tr>
-                <th id="th-time">Time</th>
-                <th id="th-location">Date</th>
-                <th id="th-note">Note</th>
+                <th>Time</th>
+                <th>Day</th>
+                <th>Date</th>
+                <th>Note</th>
               </tr>
             </thead>
             <tbody>
-              { allMeetings }
+              {allMeetings}
             </tbody>
           </table>
         </div>
       </div>
-    )
+    );
   }
 }
 
 const mapState = ({ meetings }) => ({ meetings });
 
-const mapDispatch = dispatch => ({
-  createMeeting: () => {
-    dispatch(createMeetingThunk());
-  }
-});
-
-export default connect(mapState, mapDispatch)(AllMeetings);
-
+export default connect(mapState)(AllMeetings);

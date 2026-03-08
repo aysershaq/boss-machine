@@ -1,26 +1,46 @@
+'use strict';
+
+require('dotenv').config();
+
 const express = require('express');
+const cors = require('cors');
+
+const minionsRouter = require('./routes/minionsRouter');
+const ideasRouter = require('./routes/ideasRouter');
+const meetingRouter = require('./routes/meetingRouter');
+
 const app = express();
-const cors = require('cors')
-const minionsRouter =require('./routes/minionsRouter.js')
-const ideasRouter = require('./routes/ideasRouter.js')
-const workRouter = require('./routes/workRouter.js')
-const meetingRouter = require('./routes/meetingRouter.js')
 
+// Middleware (cors + json) حسب متطلبات المشروع
+app.use(cors());
+app.use(express.json());
 
-// Add middleware for handling CORS requests from index.html
-app.use(cors())
+// Mount routers على /api
+app.use('/api', minionsRouter);
+app.use('/api', ideasRouter);
+app.use('/api', meetingRouter);
 
-// Add middware for parsing request bodies here:
+// (افتراض) 404 لأي مسار غير معروف
+app.use((req, res) => res.sendStatus(404));
 
-app.use(express.json())
-// Mount your existing apiRouter below at the '/api' path.
-const apiRouter = require('./server/api');
+// Error-handling middleware (Express يوثّق أن هذا الشكل هو المعتمد للأخطاء)
+app.use((err, req, res, next) => {
+  // eslint-disable-line no-unused-vars
+  const name = err && err.name ? err.name : 'Error';
 
+  // (افتراض) تحويل أخطاء التحقق إلى 400
+  if (
+    name === 'SequelizeValidationError' ||
+    name === 'SequelizeUniqueConstraintError' ||
+    name === 'SequelizeForeignKeyConstraintError'
+  ) {
+    return res.status(400).json({ error: err.message });
+  }
 
-app.use('/api',minionsRouter)
-app.use('/api',ideasRouter)
-app.use('/api',workRouter)
-app.use('/api',meetingRouter)
-
+  // (افتراض) أخطاء أخرى
+  return res.status(500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+  });
+});
 
 module.exports = app;

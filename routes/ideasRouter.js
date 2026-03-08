@@ -1,95 +1,112 @@
+'use strict';
 
-const express = require('express')
-const {getAllFromDatabase ,getFromDatabaseById,findDataArrayByName,addToDatabase,updateInstanceInDatabase,deleteFromDatabasebyId}= require('../server/db.js')
-const checkMillionDollarIdea =require('../server/checkMillionDollarIdea.js')
-const ideasRouter = express.Router()
-const bodyParser = require('body-parser')
-const {db} =require('../server/db.js')
-const cors = require('cors');
-const path = require('path');
+const express = require('express');
+const { Idea } = require('../models');
+const checkMillionDollarIdea = require('../server/checkMillionDollarIdea');
 
+const ideasRouter = express.Router();
 
-ideasRouter.use(cors()); 
-
-
-
-
-
-ideasRouter.use(bodyParser.json())
-
-
-// get all ideas from db
-ideasRouter.get('/ideas',(req,res,next)=>{
- let array = getAllFromDatabase("ideas")
-
-  if(array){
-  res.status(200).send(array)
-}else{
-  res.status(400).send('not found')
+function isNumericId(value) {
+  return typeof value === 'string' && /^[0-9]+$/.test(value);
 }
-})
 
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
 
-// create new idea and save ti to the database 
-ideasRouter.post('/ideas',checkMillionDollarIdea,(req,res)=>{
-
-  // {id,name,title,salary} = req.body;
-     let data = addToDatabase('ideas',req.body)
-      if(data){
-     res.status(201).send(data)
-      }else{
-        res.status(404).send('model not found')
-      }
-
-})
-
-// get idea by its id
-ideasRouter.get('/ideas/:ideaId',(req,res)=>{
- const minionId = req.params.minionId
-const data = getFromDatabaseById("ideas",req.params.ideaId)
-  if(data){
-    res.status(200).send(data)
-  }else{
-    res.status(404).send("no id matched")
-  }
-
-})
-
-// update existing idea  with an Id
-ideasRouter.put('/ideas/:ideaId', (req, res) => {
-  const ideaId = req.params.ideaId;
-
-  // Check if idea exists
-  const existingIdea = getFromDatabaseById('ideas', ideaId);
-  if (!existingIdea) return res.status(404).send();
-
-  // Build updated idea object
-  const updatedIdea = {
-    id: ideaId,
-    name: req.body.name,
-    description: req.body.description,
-    weeklyRevenue: Number(req.body.weeklyRevenue),
-    numWeeks: Number(req.body.numWeeks)
+function pickIdeaPayload(body) {
+  return {
+    name: typeof body.name === 'string' ? body.name : '',
+    description: typeof body.description === 'string' ? body.description : '',
+    weeklyRevenue: Number.isFinite(Number(body.weeklyRevenue)) ? Number(body.weeklyRevenue) : 0,
+    numWeeks: Number.isFinite(Number(body.numWeeks)) ? Number(body.numWeeks) : 0,
   };
+}
 
-  const persistedIdea = updateInstanceInDatabase('ideas', updatedIdea);
-  if (!persistedIdea) return res.status(400).send(); // invalid body
+// ideasRouter.param(
+//   'ideaId',
+//   asyncHandler(async (req, res, next, ideaId) => {
+//     if (!isNumericId(ideaId)) return res.sendStatus(404);
 
-  res.status(200).send(persistedIdea);
-});
+//     const idea = await Idea.findByPk(Number(ideaId));
+//     if (!idea) return res.sendStatus(404);
 
+//     req.idea = idea;
+//     next();
+//   })
+// );
 
-ideasRouter.delete('/ideas/:id', (req, res) => {
+ideasRouter.get(
+  '/ideas',
+  asyncHandler(async (req, res) => {
+    const ideas = await Idea.findAll({ order: [['id', 'ASC']] });
+    res.status(200).json(ideas);
+  })
+);
 
-  const deleted = deleteFromDatabasebyId('ideas', req.params.id);
-  
- 
-  if (deleted) {
-    res.status(204).send(); // No content, deletion successful
-  } else {
-    res.status(404).send(); // Idea not found
+ideasRouter.get('/ideas/:ideaId',async (req, res) => {
+
+  const ideaID = req.params.ideaId
+  console.log(ideaID)
+
+  try{
+if (!isNumericId(ideaID)) return res.sendStatus(404);
+
+    const idea = await Idea.findByPk(Number(ideaID));
+    if (!idea) return res.sendStatus(404);
+
+   res.status(200).json(idea)
+  }catch(err){
+   res.status(500).json({msg:"internl server error",msg:err.message})
   }
+   
 });
 
+ideasRouter.post(
+  '/ideas',
+  checkMillionDollarIdea,
+  asyncHandler(async (req, res) => {
+    const created = await Idea.create(pickIdeaPayload(req.body));
+    res.status(201).json(created);
+  })
+);
 
-module.exports = ideasRouter
+// (افتراض) نفعل checkMillionDollarIdea أيضًا في PUT لسلامة البيانات
+ideasRouter.put(
+  '/ideas/:ideaId',
+  checkMillionDollarIdea,
+  asyncHandler(async (req, res) => {
+     const ideaID = req.params.ideaId
+
+     const {name,description,numWeeks,weeklyRevenue} = req.body
+   try{
+    if (!isNumericId(ideaID)) return res.sendStatus(404);
+    const updated = await Idea.update({name,description,numWeeks,weeklyRevenue},{where:{id:ideaID}})
+   res.status(200).json({status:"updated success",updated})
+  }catch(err){
+
+       res.status(500).json({msg:"internl server error",msg:err.message})
+
+
+  }
+})
+);
+
+ideasRouter.delete(
+  '/ideas/:ideaId',
+  asyncHandler(async (req, res) => {
+
+    const ideaID = req.params.ideaId
+   try{
+    if (!isNumericId(ideaID)) return res.sendStatus(404);
+    const deleted = await Idea.destroy({where:{id:ideaID}})
+
+    res.status(204).json({status:"deleted sucessfully",deleted})
+   }catch(err){
+
+   res.status(500).json({msg:"internl server error",msg:err.message})
+   }
+  })
+);
+
+module.exports = ideasRouter;
